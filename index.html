@@ -98,7 +98,7 @@
     <button class="d" data-k="down" aria-label="Abajo">▼</button>
   </div>
   <div class="acts">
-    <button class="act small" id="act2Btn" data-k="act2" hidden>BENGALA</button>
+    <button class="act small" id="act2Btn" data-k="act2" hidden>VIRAJE G</button>
     <button class="act" id="actBtn" data-k="act">ACCIÓN</button>
   </div>
 </div>
@@ -732,7 +732,7 @@
     function hudUpdate() { setStat('time', fmtT(G.time)); setStat('bombs', G.player.bombs); setStat('lives', G.lives); setStat('hp', `${Math.max(0, G.player.hp)}/${HP}`); setStat('sunk', `${G.sunk}/${GOAL}`); setStat('score', G.score); }
     return {
       title: 'Estrecho de San Carlos', sub: '21 de mayo de 1982', blurb: 'Arcade de vista lateral: bombardeá la flota a baja altura esquivando misiles y artillería.',
-      intro: `Piloteás un A-4B Skyhawk de la V Brigada con 12 bombas. Cada buque muestra cuántos impactos le faltan; un misil que pierde el enganche y cae sobre otro buque también lo daña. La flota entra al estrecho sin cesar. Los buques lanzan misiles si te ven en el radar: <b>volá por debajo de la línea roja</b> para que pierdan el enganche. Si tirás demasiado bajo, <b>la bomba no arma la espoleta</b> y rebota sin explotar. Cuando te quedás sin bombas, un KC-130 pasa por arriba para rearmarte. Objetivo: hundir ${GOAL} buques.`,
+      intro: `Piloteás un A-4B Skyhawk de la V Brigada cargado con bombas de 250 kg. Cada buque muestra cuántos impactos le faltan; un misil que pierde el enganche y cae sobre otro buque también lo daña. La flota entra al estrecho sin cesar. Los buques lanzan misiles si te ven en el radar: <b>volá por debajo de la línea roja</b> para que pierdan el enganche. Si tirás demasiado bajo, <b>la bomba no arma la espoleta</b> y rebota sin explotar. Cuando te quedás sin bombas, un KC-130 te reabastece para volver al ataque. Objetivo: dejar fuera de combate ${GOAL} buques.`,
       legend: '<span class="chip"><i style="background:var(--red)"></i>Más alto: te ven los misiles</span><span class="chip"><i style="background:var(--green)"></i>Franja de lanzamiento</span><span class="chip"><i style="background:var(--amber)"></i>Más bajo: la bomba no arma</span>',
       button: 'Despegar', action: 'BOMBA', action2: null, music: MUSIC.estrecho,
       help: 'Subir y bajar: <kbd>W</kbd>/<kbd>S</kbd> o flechas · Acelerar y frenar: <kbd>A</kbd>/<kbd>D</kbd> · Soltar bomba: <kbd>Espacio</kbd>. Tres aviones, tres puntos de estructura cada uno.',
@@ -774,7 +774,7 @@
         if (P.hp < HP) { P.smokeT += dt; if (P.smokeT > .08 / (HP - P.hp)) { P.smokeT = 0; G.parts.push({ x: P.x - 30, y: P.y, vx: -P.vx * .3 + rand(-20, 20), vy: rand(-30, -5), life: rand(.6, 1.2), r: rand(3, 6), col: P.hp === 1 ? '#2b2b2b' : '#777' }); } }
         P.gunCd -= dt;
         if (keys.act && P.ammo > 0 && P.gunCd <= 0) { P.gunCd = .075; P.ammo--; G.pb.push({ x: P.x + 36, y: P.y - 2 + rand(-3, 3), vx: 820, vy: P.vy * .3 + rand(-15, 15), life: .7 }); sfx('gun'); }
-        if (act2Edge && P.flares > 0) { P.flares--; for (let i = 0; i < 8; i++) G.parts.push({ x: P.x - 20, y: P.y + 8, vx: rand(-120, -40), vy: rand(20, 120), life: rand(1, 1.6), r: rand(3, 5), col: i % 2 ? '#fff3b0' : '#ffb347', flare: true }); let n = 0; for (const m of G.missiles) if (m.lock) { m.lock = false; n++; } msg(P.x, P.y - 50, n ? `Bengalas: ${n} misil${n > 1 ? 'es' : ''} engañado${n > 1 ? 's' : ''}` : 'Bengalas', '#ffd166', 1.5); sfx('flare'); }
+        if (act2Edge && P.flares > 0) { P.flares--; for (let i = 0; i < 8; i++) G.parts.push({ x: P.x - 20, y: P.y + 8, vx: rand(-120, -40), vy: rand(20, 120), life: rand(1, 1.6), r: rand(3, 5), col: i % 2 ? '#fff3b0' : '#ffb347', flare: true }); let n = 0; for (const m of G.missiles) if (m.lock) { m.lock = false; n++; } msg(P.x, P.y - 50, n ? `Viraje G: ${n} Sidewinder sin enganche` : 'Viraje G', '#ffd166', 1.5); sfx('flare'); }
       } else { P.dead += dt; if (P.dead > 2) { if (G.lives > 0) { G.player = newPlayer(); msg(W / 2, 200, 'Mirage de reserva en el aire', '#e8e4cf', 2); } else { end(false); return; } } }
       actEdge = false; act2Edge = false; G.scroll += P.vx * dt;
       // enemigos
@@ -876,7 +876,7 @@
       for (const p of G.parts) { ctx.globalAlpha = Math.min(1, p.life); ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
       if (P.alive) {
         ctx.fillStyle = 'rgba(20,22,15,.6)'; ctx.fillRect(P.x - 22, P.y - 44, 44, 7); for (let i = 0; i < HP; i++) { ctx.fillStyle = i < P.hp ? (P.hp === 1 ? '#d9534f' : '#8fbf5a') : '#3b4330'; ctx.fillRect(P.x - 20 + i * 14, P.y - 42, 12, 3); }
-        const locked = G.missiles.some(m => m.lock); if (locked && Math.floor(G.time * 8) % 2) { ctx.fillStyle = '#ff5a52'; ctx.font = '400 16px "Black Ops One", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('¡MISIL! BENGALAS', P.x, P.y - 54); }
+        const locked = G.missiles.some(m => m.lock); if (locked && Math.floor(G.time * 8) % 2) { ctx.fillStyle = '#ff5a52'; ctx.font = '400 16px "Black Ops One", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('¡MISIL! VIRAJE G', P.x, P.y - 54); }
         // indicadores de enemigos fuera de pantalla
         for (const e of G.enemies) if (e.x < -20 || e.x > W + 20) { ctx.fillStyle = '#ff5a52'; const ax = e.x < 0 ? 14 : W - 14; ctx.beginPath(); ctx.moveTo(ax, e.y); ctx.lineTo(ax + (e.x < 0 ? 10 : -10), e.y - 6); ctx.lineTo(ax + (e.x < 0 ? 10 : -10), e.y + 6); ctx.closePath(); ctx.fill(); }
       }
@@ -884,12 +884,12 @@
     }
     function hudUpdate() { setStat('kills', `${G.kills}/${GOAL}`); setStat('ammo', G.player.ammo); setStat('flares', G.player.flares); setStat('lives', G.lives); setStat('hp', `${Math.max(0, G.player.hp)}/${HP}`); setStat('score', G.score); }
     return {
-      title: 'Cielo de Malvinas', sub: 'Patrulla aérea · junio de 1982', blurb: 'Combate aire-aire: tu Mirage III contra los Sea Harrier, con cañones de 30 mm y bengalas.',
-      intro: `Piloteás un Mirage IIIEA de la VIII Brigada en patrulla sobre las islas. Los Sea Harrier entran de frente tirando con sus cañones y, cuando pasan por atrás, te lanzan <b>Sidewinder</b>. Tus armas: dos cañones DEFA de 30 mm (mantené acción para disparar) y <b>bengalas</b> que engañan a todos los misiles enganchados. Objetivo: ${GOAL} derribos.`,
-      legend: '<span class="chip"><i style="background:var(--amber)"></i>Cañones · 300 proyectiles</span><span class="chip"><i style="background:var(--cyan)"></i>Bengalas · 3 por avión</span><span class="chip"><i style="background:var(--red)"></i>Sidewinder: corta el enganche con bengalas</span>',
-      button: 'Al combate', action: 'FUEGO', action2: 'BENGALA', music: MUSIC.aire,
-      help: 'Subir y bajar: <kbd>W</kbd>/<kbd>S</kbd> o flechas · Acelerar y frenar: <kbd>A</kbd>/<kbd>D</kbd> · Cañones: <kbd>Espacio</kbd> (mantener) · Bengalas: <kbd>F</kbd> o <kbd>Shift</kbd>. Cada derribo devuelve munición; cada oleada limpia rearma todo.',
-      failText: 'Se perdieron los tres Mirage antes de completar los derribos.', stats: [{ id: 'kills', label: 'Derribos' }, { id: 'ammo', label: 'Munición' }, { id: 'flares', label: 'Bengalas' }, { id: 'lives', label: 'Aviones' }, { id: 'hp', label: 'Estructura' }, { id: 'score', label: 'Puntos' }],
+      title: 'Cielo de Malvinas', sub: 'Patrulla aérea · 1° de mayo de 1982', blurb: 'Combate aire-aire: tu Mirage III contra los Sea Harrier, con cañones de 30 mm y maniobras evasivas.',
+      intro: `Piloteás un Mirage IIIEA de la VIII Brigada en patrulla sobre las islas. Los Sea Harrier entran de frente tirando con sus cañones y, cuando pasan por atrás, te lanzan <b>Sidewinder</b>. Tus armas: dos cañones DEFA de 30 mm (mantené acción para disparar) y <b>maniobras evasivas cerradas (virajes G)</b> que rompen el enganche de todos los Sidewinder. Objetivo: ${GOAL} derribos.`,
+      legend: '<span class="chip"><i style="background:var(--amber)"></i>Cañones · 300 proyectiles</span><span class="chip"><i style="background:var(--cyan)"></i>Virajes G · 3 por avión</span><span class="chip"><i style="background:var(--red)"></i>Sidewinder: rompé el enganche con un viraje G</span>',
+      button: 'Al combate', action: 'FUEGO', action2: 'VIRAJE G', music: MUSIC.aire,
+      help: 'Subir y bajar: <kbd>W</kbd>/<kbd>S</kbd> o flechas · Acelerar y frenar: <kbd>A</kbd>/<kbd>D</kbd> · Cañones: <kbd>Espacio</kbd> (mantener) · Viraje G: <kbd>F</kbd> o <kbd>Shift</kbd>. Cada derribo devuelve munición; cada oleada limpia rearma todo.',
+      failText: 'Se perdieron los tres Mirage antes de completar los derribos.', stats: [{ id: 'kills', label: 'Derribos' }, { id: 'ammo', label: 'Munición' }, { id: 'flares', label: 'Virajes G' }, { id: 'lives', label: 'Aviones' }, { id: 'hp', label: 'Estructura' }, { id: 'score', label: 'Puntos' }],
       init, begin, update, draw, hud: hudUpdate,
     };
   })();
