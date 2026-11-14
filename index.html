@@ -293,7 +293,7 @@
     ov.querySelector('#again').addEventListener('click', showStart); ov.hidden = false;
     loadBoard().then(b => { const el = ov.querySelector('#board'); if (el) el.innerHTML = boardHtml(b); });
   }
-  function grade(total) { return total >= 8000 ? 'Grado final: Brigadier.' : total >= 5500 ? 'Grado final: Comodoro.' : total >= 3000 ? 'Grado final: Vicecomodoro.' : 'Grado final: Mayor.'; }
+  function grade(total) { return total >= 10000 ? 'Grado final: Brigadier General.' : total >= 8500 ? 'Grado final: Brigadier Mayor.' : total >= 7000 ? 'Grado final: Brigadier.' : total >= 5500 ? 'Grado final: Comodoro.' : total >= 4000 ? 'Grado final: Vicecomodoro.' : 'Grado final: Mayor.'; }
   function setStat(id, v) { const e = document.getElementById('st_' + id); if (e) e.textContent = v; }
   function msgList() { return []; }
 
@@ -376,7 +376,7 @@
     }
     function end() {
       G.running = false;
-      const r = G.out >= 7 ? 'Suboficial Mayor' : G.out >= 5 ? 'Sargento Primero' : G.out >= 3 ? 'Cabo Primero' : 'Aprendiz de pista';
+      const r = G.out >= 9 ? 'Suboficial Mayor' : G.out >= 7 ? 'Suboficial Principal' : G.out >= 5 ? 'Suboficial Ayudante' : G.out >= 3 ? 'Cabo Principal' : G.out >= 1 ? 'Cabo Primero' : 'Cabo';
       finishLevel(true, G.score, `Despachados: <b>${G.out}</b> · Perdidos: ${G.fail} · Grado: <b>${r}</b>`);
     }
     /* dibujo */
@@ -638,7 +638,7 @@
     }
     function hit(why) { const P = G.player; if (!P.alive || P.inv > 0) return; P.hp--; P.inv = 1.2; boom(P.x, P.y, 18, '#ff8c42', 140); sfx('hit'); if (P.hp <= 0) { kill(why); return; } msg(P.x, P.y - 50, `${why} · estructura ${P.hp}/${HP}`, '#f2b134', 1.6); }
     function kill(why) { const P = G.player; if (!P.alive) return; P.alive = false; P.dead = 0; G.lives--; boom(P.x, P.y, 50, '#ff8c42', 220); boom(P.x, P.y, 25, '#2b2b2b', 100); sfx('die'); msg(P.x, P.y - 50, why, '#d9534f', 2); if (G.lives <= 0) msg(W / 2, 200, 'No quedan aviones', '#d9534f', 2); }
-    function end(ok) { G.running = false; const r = G.sunk >= 8 ? 'Capitán' : G.sunk >= 4 ? 'Primer Teniente' : 'Alférez'; finishLevel(ok, G.score, `Buques hundidos: <b>${G.sunk}</b> de ${GOAL} · Tiempo: ${fmtT(G.time)} · Grado: <b>${r}</b>`); }
+    function end(ok) { G.running = false; const r = G.sunk >= 8 ? 'Capitán' : G.sunk >= 5 ? 'Primer Teniente' : G.sunk >= 2 ? 'Teniente' : 'Alférez'; finishLevel(ok, G.score, `Buques hundidos: <b>${G.sunk}</b> de ${GOAL} · Tiempo: ${fmtT(G.time)} · Grado: <b>${r}</b>`); }
     /* dibujo */
     function drawBackground() {
       const g = ctx.createLinearGradient(0, 0, 0, SEA); g.addColorStop(0, '#5b6670'); g.addColorStop(.7, '#8a929a'); g.addColorStop(1, '#a8aeb3'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, SEA);
@@ -732,7 +732,7 @@
     function hudUpdate() { setStat('time', fmtT(G.time)); setStat('bombs', G.player.bombs); setStat('lives', G.lives); setStat('hp', `${Math.max(0, G.player.hp)}/${HP}`); setStat('sunk', `${G.sunk}/${GOAL}`); setStat('score', G.score); }
     return {
       title: 'Estrecho de San Carlos', sub: '21 de mayo de 1982', blurb: 'Arcade de vista lateral: bombardeá la flota a baja altura esquivando misiles y artillería.',
-      intro: `Pilotás un A-4B Skyhawk de la V Brigada con 12 bombas. Cada buque muestra cuántos impactos le faltan; un misil que pierde el enganche y cae sobre otro buque también lo daña. La flota entra al estrecho sin parar. Los buques lanzan misiles si te ven en el radar: <b>volá por debajo de la línea roja</b> para que pierdan el enganche. Si tirás demasiado bajo, <b>la bomba no arma la espoleta</b> y rebota sin explotar. Cuando te quedás sin bombas, un KC-130 pasa por arriba para rearmarte. Objetivo: hundir ${GOAL} buques.`,
+      intro: `Piloteás un A-4B Skyhawk de la V Brigada con 12 bombas. Cada buque muestra cuántos impactos le faltan; un misil que pierde el enganche y cae sobre otro buque también lo daña. La flota entra al estrecho sin cesar. Los buques lanzan misiles si te ven en el radar: <b>volá por debajo de la línea roja</b> para que pierdan el enganche. Si tirás demasiado bajo, <b>la bomba no arma la espoleta</b> y rebota sin explotar. Cuando te quedás sin bombas, un KC-130 pasa por arriba para rearmarte. Objetivo: hundir ${GOAL} buques.`,
       legend: '<span class="chip"><i style="background:var(--red)"></i>Más alto: te ven los misiles</span><span class="chip"><i style="background:var(--green)"></i>Franja de lanzamiento</span><span class="chip"><i style="background:var(--amber)"></i>Más bajo: la bomba no arma</span>',
       button: 'Despegar', action: 'BOMBA', action2: null, music: MUSIC.estrecho,
       help: 'Subir y bajar: <kbd>W</kbd>/<kbd>S</kbd> o flechas · Acelerar y frenar: <kbd>A</kbd>/<kbd>D</kbd> · Soltar bomba: <kbd>Espacio</kbd>. Tres aviones, tres puntos de estructura cada uno.',
@@ -819,7 +819,7 @@
     function killEnemy(e) { if (e.dead) return; e.dead = true; G.kills++; G.score += 400; boom(e.x, e.y, 50, '#ff8c42', 220); boom(e.x, e.y, 25, '#2b2b2b', 100); sfx('kill'); msg(e.x, e.y - 40, `Derribado +400`, '#8fbf5a', 2); G.player.ammo = Math.min(AMMO, G.player.ammo + 60); if (G.kills >= GOAL) end(true); }
     function hit(why) { const P = G.player; if (!P.alive || P.inv > 0) return; P.hp--; P.inv = 1.2; boom(P.x, P.y, 18, '#ff8c42', 140); sfx('hit'); if (P.hp <= 0) { kill(why); return; } msg(P.x, P.y - 50, `${why} · estructura ${P.hp}/${HP}`, '#f2b134', 1.6); }
     function kill(why) { const P = G.player; if (!P.alive) return; P.alive = false; P.dead = 0; G.lives--; boom(P.x, P.y, 50, '#ff8c42', 220); boom(P.x, P.y, 25, '#2b2b2b', 100); sfx('die'); msg(P.x, P.y - 50, why, '#d9534f', 2); if (G.lives <= 0) msg(W / 2, 200, 'No quedan Mirage', '#d9534f', 2); }
-    function end(ok) { G.running = false; const r = G.kills >= 10 ? 'As de la escuadrilla' : G.kills >= 5 ? 'Capitán' : 'Teniente'; finishLevel(ok, G.score, `Derribos: <b>${G.kills}</b> de ${GOAL} · Oleadas: ${G.wave} · Grado: <b>${r}</b>`); }
+    function end(ok) { G.running = false; const r = G.kills >= 10 ? 'Mayor' : G.kills >= 6 ? 'Capitán' : G.kills >= 3 ? 'Primer Teniente' : 'Teniente'; finishLevel(ok, G.score, `Derribos: <b>${G.kills}</b> de ${GOAL} · Oleadas: ${G.wave} · Grado: <b>${r}</b>`); }
     /* dibujo */
     function drawBackground() {
       const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3f5570'); g.addColorStop(.6, '#7f90a0'); g.addColorStop(1, '#aab3ba'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -885,7 +885,7 @@
     function hudUpdate() { setStat('kills', `${G.kills}/${GOAL}`); setStat('ammo', G.player.ammo); setStat('flares', G.player.flares); setStat('lives', G.lives); setStat('hp', `${Math.max(0, G.player.hp)}/${HP}`); setStat('score', G.score); }
     return {
       title: 'Cielo de Malvinas', sub: 'Patrulla aérea · junio de 1982', blurb: 'Combate aire-aire: tu Mirage III contra los Sea Harrier, con cañones de 30 mm y bengalas.',
-      intro: `Pilotás un Mirage IIIEA de la VIII Brigada en patrulla sobre las islas. Los Sea Harrier entran de frente tirando con sus cañones y, cuando pasan por atrás, te lanzan <b>Sidewinder</b>. Tus armas: dos cañones DEFA de 30 mm (mantené acción para disparar) y <b>bengalas</b> que engañan a todos los misiles enganchados. Objetivo: ${GOAL} derribos.`,
+      intro: `Piloteás un Mirage IIIEA de la VIII Brigada en patrulla sobre las islas. Los Sea Harrier entran de frente tirando con sus cañones y, cuando pasan por atrás, te lanzan <b>Sidewinder</b>. Tus armas: dos cañones DEFA de 30 mm (mantené acción para disparar) y <b>bengalas</b> que engañan a todos los misiles enganchados. Objetivo: ${GOAL} derribos.`,
       legend: '<span class="chip"><i style="background:var(--amber)"></i>Cañones · 300 proyectiles</span><span class="chip"><i style="background:var(--cyan)"></i>Bengalas · 3 por avión</span><span class="chip"><i style="background:var(--red)"></i>Sidewinder: corta el enganche con bengalas</span>',
       button: 'Al combate', action: 'FUEGO', action2: 'BENGALA', music: MUSIC.aire,
       help: 'Subir y bajar: <kbd>W</kbd>/<kbd>S</kbd> o flechas · Acelerar y frenar: <kbd>A</kbd>/<kbd>D</kbd> · Cañones: <kbd>Espacio</kbd> (mantener) · Bengalas: <kbd>F</kbd> o <kbd>Shift</kbd>. Cada derribo devuelve munición; cada oleada limpia rearma todo.',
