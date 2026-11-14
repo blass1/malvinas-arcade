@@ -31,7 +31,7 @@
   .stat span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .mute, .menuBtn { background: var(--panel-2); border: 1px solid var(--line); color: var(--fg); font-family: var(--mono); font-size: 12px; padding: 6px 10px; cursor: pointer; }
   .mute:focus-visible, .menuBtn:focus-visible { outline: 2px solid var(--amber); }
-  .stage { position: relative; width: 100%; max-width: 960px; aspect-ratio: 960 / 600; background: #22261a; border: 2px solid var(--line); box-sizing: border-box; }
+  .stage { position: relative; width: 100%; max-width: min(960px, calc((100dvh - 150px) * 1.6)); aspect-ratio: 960 / 600; background: #22261a; border: 2px solid var(--line); box-sizing: border-box; }
   canvas { width: 100%; height: 100%; display: block; touch-action: none; }
   .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: rgba(20,22,15,.88); padding: 24px; box-sizing: border-box; gap: 14px; overflow: auto; }
   .overlay h2 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 5vw, 44px); margin: 0; color: var(--amber); line-height: 1; }
@@ -74,6 +74,12 @@
   .act { width: 110px; height: 110px; border-radius: 50%; font-size: 15px; letter-spacing: .06em; }
   .act.small { width: 72px; height: 72px; font-size: 12px; }
   .help { max-width: 960px; width: 100%; font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+  .disc { max-width: 960px; width: 100%; font-size: 12px; color: var(--muted); margin: 0; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 8px; }
+  .overlay .disc { border: 1px solid var(--line); padding: 8px 12px; max-width: 60ch; }
+  .stage:fullscreen { max-width: none; width: 100vw; height: 100vh; aspect-ratio: auto; border: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .stage:fullscreen canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 960 / 600; }
+  .touch { display: none !important; }
+  @media (pointer: coarse) { .help kbd { display: none; } .help .kb { display: none; } }
   .help kbd { font-family: var(--mono); background: var(--panel); border: 1px solid var(--line); padding: 1px 6px; color: var(--fg); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -104,6 +110,7 @@
 </div>
 
 <p class="help" id="help">Elegí un nivel para empezar.</p>
+<p class="disc">Malvinas Arcade es un juego de ficción con fines de entretenimiento. Toma nombres de aeronaves, buques, unidades y lugares de 1982, pero las situaciones, cifras y resultados no están basados en hechos reales ni pretenden representarlos. Hecho con respeto por quienes combatieron.</p>
 
 <script>
 (() => {
@@ -120,6 +127,64 @@
   /* ---------- entrada ---------- */
   const keys = { up: 0, down: 0, left: 0, right: 0, act: 0, act2: 0 };
   let actEdge = false, act2Edge = false;
+  // táctil: joystick flotante en la mitad izquierda del canvas, acción manteniendo el dedo en la derecha, botón secundario dibujado
+  const T = { active: false, x: 0, y: 0, id: null, ox: 0, oy: 0, cx: 0, cy: 0, actId: null, act2Id: null, act2Rect: null, exitRect: null };
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const inX = () => T.active ? T.x : (keys.right - keys.left);
+  const inY = () => T.active ? T.y : (keys.down - keys.up);
+  const stagePos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; };
+  const inRect = (p, r) => r && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+  cv.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && !coarse) return;
+    const p = stagePos(e); e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    if (inRect(p, T.exitRect)) { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); return; }
+    if (inRect(p, T.act2Rect)) { if (!keys.act2) act2Edge = true; keys.act2 = 1; T.act2Id = e.pointerId; return; }
+    if (p.x < W * .45) { if (T.id === null) { T.id = e.pointerId; T.ox = T.cx = p.x; T.oy = T.cy = p.y; T.active = true; T.x = T.y = 0; } }
+    else if (T.actId === null) { T.actId = e.pointerId; if (!keys.act) actEdge = true; keys.act = 1; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (e.pointerId !== T.id) return; e.preventDefault();
+    const p = stagePos(e), R = 64, dead = 8; let dx = p.x - T.ox, dy = p.y - T.oy; const l = Math.hypot(dx, dy);
+    if (l > R) { T.ox += dx / l * (l - R); T.oy += dy / l * (l - R); dx = dx / l * R; dy = dy / l * R; } // el centro sigue al dedo
+    T.cx = T.ox + dx; T.cy = T.oy + dy;
+    T.x = Math.abs(dx) < dead ? 0 : dx / R; T.y = Math.abs(dy) < dead ? 0 : dy / R;
+  });
+  const touchEnd = e => {
+    if (e.pointerId === T.id) { T.id = null; T.active = false; T.x = T.y = 0; }
+    if (e.pointerId === T.actId) { T.actId = null; keys.act = 0; }
+    if (e.pointerId === T.act2Id) { T.act2Id = null; keys.act2 = 0; }
+  };
+  cv.addEventListener('pointerup', touchEnd); cv.addEventListener('pointercancel', touchEnd);
+  function drawTouchUI() {
+    T.act2Rect = null; T.exitRect = null;
+    if (!coarse || !current || !ov.hidden) return;
+    ctx.save(); ctx.lineWidth = 2;
+    // joystick
+    if (T.active) {
+      ctx.strokeStyle = 'rgba(232,228,207,.5)'; ctx.fillStyle = 'rgba(20,22,15,.25)'; ctx.beginPath(); ctx.arc(T.ox, T.oy, 64, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(242,177,52,.85)'; ctx.beginPath(); ctx.arc(T.cx, T.cy, 26, 0, Math.PI * 2); ctx.fill();
+    } else { ctx.strokeStyle = 'rgba(232,228,207,.18)'; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.arc(110, H - 110, 64, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(232,228,207,.35)'; ctx.font = '600 11px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('MOVER', 110, H - 106); }
+    // acción (toda la mitad derecha)
+    const ax = W - 96, ay = H - 96;
+    ctx.fillStyle = keys.act ? 'rgba(242,177,52,.55)' : 'rgba(20,22,15,.35)'; ctx.strokeStyle = keys.act ? '#f2b134' : 'rgba(232,228,207,.35)';
+    ctx.beginPath(); ctx.arc(ax, ay, 52, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = keys.act ? '#1a1500' : 'rgba(232,228,207,.8)'; ctx.font = '400 15px "Black Ops One", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(actBtn.textContent, ax, ay + 5);
+    if (!act2Btn.hidden) {
+      T.act2Rect = { x: W - 176, y: H - 210, w: 140, h: 56 };
+      const r = T.act2Rect; ctx.fillStyle = keys.act2 ? 'rgba(91,192,222,.6)' : 'rgba(20,22,15,.35)'; ctx.strokeStyle = keys.act2 ? '#5bc0de' : 'rgba(232,228,207,.35)';
+      ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(232,228,207,.9)'; ctx.font = '400 14px "Black Ops One", Impact, sans-serif'; ctx.fillText(act2Btn.textContent, r.x + r.w / 2, r.y + r.h / 2 + 5);
+    }
+    // HUD compacto en pantalla completa (los stats de arriba quedan fuera de la vista)
+    if (document.fullscreenElement) {
+      const stats = [...document.querySelectorAll('#hud .stat')].map(s => s.querySelector('span').textContent + ' ' + s.querySelector('b').textContent);
+      ctx.fillStyle = 'rgba(20,22,15,.55)'; ctx.fillRect(0, 0, W, 26);
+      ctx.fillStyle = '#e8e4cf'; ctx.font = '500 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'left'; ctx.fillText(stats.join('   ·   '), 12, 17);
+      T.exitRect = { x: W - 70, y: 0, w: 70, h: 26 }; ctx.textAlign = 'right'; ctx.fillStyle = '#f2b134'; ctx.fillText('SALIR ✕', W - 10, 17);
+    }
+    ctx.restore();
+  }
   const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', KeyE: 'act', Space: 'act', KeyF: 'act2', ShiftLeft: 'act2', ShiftRight: 'act2' };
   const typing = () => { const t = document.activeElement; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'); };
   addEventListener('keydown', e => { if (typing()) return; const k = KEYMAP[e.code]; if (!k) return; e.preventDefault(); if (k === 'act' && !keys.act) actEdge = true; if (k === 'act2' && !keys.act2) act2Edge = true; keys[k] = 1; });
@@ -255,13 +320,18 @@
     hud.innerHTML = `<button class="mute" id="muteBtn" type="button">${A.on ? 'Sonido: ON' : 'Sonido: OFF'}</button>`; bindMute();
     ov.innerHTML = `<h2><small>Tres niveles · una campaña</small>Malvinas Arcade</h2>
       <p>Del hangar en el continente al cielo sobre las islas. El puntaje se acumula entre niveles y queda en la tabla de posiciones.</p>
+      <p class="disc">Juego de ficción. Las situaciones, cifras y resultados no están basados en hechos reales.</p>
       <form class="namerow" id="nameForm"><label for="pname">Nombre del piloto</label><input id="pname" maxlength="18" autocomplete="off" placeholder="Tu nombre" value="${esc(local.name)}" required><button class="btn" type="submit">Empezar campaña</button></form>
       <div id="board"><p class="rank">Cargando tabla de posiciones…</p></div>`;
     ov.querySelector('#nameForm').addEventListener('submit', e => { e.preventDefault(); const n = ov.querySelector('#pname').value.trim(); if (!n) return; audioInit(); local.name = n; saveLocal(); run = { name: n, scores: [0, 0, 0] }; startLevel(0); });
     ov.hidden = false;
     loadBoard().then(b => { const el = ov.querySelector('#board'); if (el) el.innerHTML = boardHtml(b); });
   }
-  function bindMute() { const b = document.getElementById('muteBtn'); if (b) b.addEventListener('click', () => { audioInit(); A.on = !A.on; A.master.gain.setTargetAtTime(A.on ? .8 : 0, A.ctx.currentTime, .05); b.textContent = A.on ? 'Sonido: ON' : 'Sonido: OFF'; }); }
+  function bindMute() {
+    const b = document.getElementById('muteBtn'); if (b) b.addEventListener('click', () => { audioInit(); A.on = !A.on; A.master.gain.setTargetAtTime(A.on ? .8 : 0, A.ctx.currentTime, .05); b.textContent = A.on ? 'Sonido: ON' : 'Sonido: OFF'; });
+    if (coarse && b && document.fullscreenEnabled) { const f = document.createElement('button'); f.className = 'mute'; f.type = 'button'; f.textContent = 'Pantalla completa'; b.after(f);
+      f.addEventListener('click', () => { const st = document.querySelector('.stage'); st.requestFullscreen().then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); }).catch(() => {}); }); }
+  }
   function showIntro(i) {
     const L = LEVELS[i];
     ov.innerHTML = `<h2><small>Nivel ${i + 1} de 3 · ${L.sub}</small>${L.title}</h2><p>${L.intro}</p><div class="legend">${L.legend}</div><div class="btnrow"><button class="btn" id="go">${L.button}</button><button class="btn ghost" id="back">Abandonar campaña</button></div>`;
@@ -271,7 +341,7 @@
   }
   function startLevel(i) {
     const L = LEVELS[i]; current = L; L.index = i;
-    hTitle.textContent = L.title; hSub.textContent = `Nivel ${i + 1} · ${L.sub} · ${run.name}`; help.innerHTML = L.help; actBtn.textContent = L.action; act2Btn.hidden = !L.action2; if (L.action2) act2Btn.textContent = L.action2;
+    hTitle.textContent = L.title; hSub.textContent = `Nivel ${i + 1} · ${L.sub} · ${run.name}`; help.innerHTML = coarse ? 'Mitad izquierda de la pantalla: joystick (apoyá y arrastrá). Mitad derecha: mantené el dedo para ' + L.action.toLowerCase() + (L.action2 ? '; botón ' + L.action2 + ' en pantalla' : '') + '. Jugá en horizontal y en pantalla completa.' : L.help; actBtn.textContent = L.action; act2Btn.hidden = !L.action2; if (L.action2) act2Btn.textContent = L.action2;
     hud.innerHTML = L.stats.map(s => `<div class="stat"><b id="st_${s.id}">–</b><span>${s.label}</span></div>`).join('') + `<button class="mute" id="muteBtn" type="button">${A.on ? 'Sonido: ON' : 'Sonido: OFF'}</button><button class="menuBtn" id="menuBtn" type="button">Abandonar</button>`;
     bindMute(); document.getElementById('menuBtn').addEventListener('click', () => { current = null; showStart(); });
     L.init(); musicSet(L.music); showIntro(i);
@@ -333,8 +403,8 @@
       G.t -= dt; if (G.t <= 0) { G.t = 0; end(); return; }
       if (G.t < 10 && Math.ceil(G.t) !== G.lastTick) { G.lastTick = Math.ceil(G.t); sfx('tick'); }
       G.spawnIn -= dt; if (G.spawnIn <= 0) { spawnPlane(); G.spawnInterval = Math.max(5.5, G.spawnInterval - 1.2); G.spawnIn = G.spawnInterval; }
-      let dx = keys.right - keys.left, dy = keys.down - keys.up;
-      if (dx || dy) { const l = Math.hypot(dx, dy); dx /= l; dy /= l; P.walk += dt * 10; if (dx) P.dir = Math.sign(dx); G.stepT += dt; if (G.stepT > .26) { G.stepT = 0; sfx('step'); } }
+      let dx = inX(), dy = inY();
+      if (dx || dy) { const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } P.walk += dt * 10 * Math.min(1, l); if (dx) P.dir = Math.sign(dx); G.stepT += dt; if (G.stepT > .26) { G.stepT = 0; sfx('step'); } }
       P.x = Math.max(24, Math.min(W - 24, P.x + dx * 270 * dt)); P.y = Math.max(240, Math.min(H - 24, P.y + dy * 270 * dt));
       const nearStation = STATIONS.find(s => dist(s, P) < 70);
       const nearPlane = G.planes.find(p => p.state === 'ready' && dist({ x: p.x, y: p.y + 40 }, P) < 95);
@@ -504,7 +574,7 @@
       if (p.prog > 0) { ctx.strokeStyle = ITEMS[p.progItem].color; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(p.x, p.y + 40, 34, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.prog); ctx.stroke(); }
     }
     function drawPlayer() {
-      const P = G.player, d = P.dir, working = !!(G.near && G.near.plane && G.near.plane.prog > 0), moving = keys.up || keys.down || keys.left || keys.right;
+      const P = G.player, d = P.dir, working = !!(G.near && G.near.plane && G.near.plane.prog > 0), moving = inX() || inY();
       const sw = moving ? Math.sin(P.walk) : 0, bob = moving ? Math.abs(Math.sin(P.walk)) * 2 : 0, x = P.x, y = P.y - bob;
       ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.45)';
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(P.x, P.y + 20, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
@@ -573,8 +643,8 @@
       if (!G.tanker && P.alive && wantTanker && G.tankerCd <= 0) { G.tanker = { x: -160, y: 70 }; G.tankerT = 0; msg(W / 2, 110, 'KC-130 en la zona: subí y acoplate', '#5bc0de', 2.5); }
       if (G.tanker) { G.tanker.x += 120 * dt; if (P.alive && Math.abs(P.x - G.tanker.x) < 60 && Math.abs(P.y - (G.tanker.y + 28)) < 26) { P.bombs = BOMBS; P.hp = Math.min(HP, P.hp + 1); G.tanker = null; G.tankerCd = 5; msg(P.x, P.y - 50, 'Rearmado: 12 bombas · estructura +1', '#5bc0de', 2); sfx('chime'); } else if (G.tanker.x > W + 200) { G.tanker = null; G.tankerCd = 4; } }
       if (P.alive) {
-        const targetVy = (keys.down - keys.up) * 190; P.vy += (targetVy - P.vy) * Math.min(1, dt * 6);
-        P.vx = Math.max(170, Math.min(330, P.vx + (keys.right - keys.left) * 160 * dt));
+        const targetVy = inY() * 190; P.vy += (targetVy - P.vy) * Math.min(1, dt * 6);
+        P.vx = Math.max(170, Math.min(330, P.vx + inX() * 160 * dt));
         P.y += P.vy * dt; P.x = Math.max(120, Math.min(520, P.x + (P.vx - 230) * dt * .5));
         if (P.y > SEA - 18) { P.hp = 0; kill('Pegaste en el agua'); }
         if (P.hp < HP) { P.smokeT += dt; if (P.smokeT > .08 / (HP - P.hp)) { P.smokeT = 0; G.parts.push({ x: P.x - 30, y: P.y, vx: -P.vx * .3 + rand(-20, 20), vy: rand(-30, -5), life: rand(.6, 1.2), r: rand(3, 6), col: P.hp === 1 ? '#2b2b2b' : '#777' }); } }
@@ -685,7 +755,7 @@
       ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.ellipse(0, -4, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#74acdf'; ctx.beginPath(); ctx.arc(-8, 0, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-8, 0, 2.4, 0, Math.PI * 2); ctx.fill();
       for (let i = 0; i < Math.min(3, P.bombs); i++) { ctx.fillStyle = '#4a4f45'; ctx.beginPath(); ctx.ellipse(-8 + i * 10, 15, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
-      if (keys.right) { ctx.fillStyle = `rgba(255,170,70,${.6 + Math.random() * .3})`; ctx.beginPath(); ctx.ellipse(-40, 1, 8 + Math.random() * 4, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+      if (inX() > .3) { ctx.fillStyle = `rgba(255,170,70,${.6 + Math.random() * .3})`; ctx.beginPath(); ctx.ellipse(-40, 1, 8 + Math.random() * 4, 3, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     }
     function drawTanker(t) {
@@ -767,8 +837,8 @@
       if (G.spawnQ > 0) { G.spawnT -= dt; if (G.spawnT <= 0) { spawnEnemy(); G.spawnQ--; G.spawnT = 1.4; } }
       else if (!G.enemies.length) { G.spawnT -= dt; if (G.spawnT <= -2) { nextWave(); P.ammo = AMMO; P.flares = Math.min(FLARES, P.flares + 1); msg(P.x, P.y - 50, 'Rearmado', '#5bc0de', 1.5); } }
       if (P.alive) {
-        const targetVy = (keys.down - keys.up) * 240; P.vy += (targetVy - P.vy) * Math.min(1, dt * 6);
-        P.vx = Math.max(200, Math.min(360, P.vx + (keys.right - keys.left) * 180 * dt));
+        const targetVy = inY() * 240; P.vy += (targetVy - P.vy) * Math.min(1, dt * 6);
+        P.vx = Math.max(200, Math.min(360, P.vx + inX() * 180 * dt));
         P.y = Math.max(40, Math.min(560, P.y + P.vy * dt)); P.x = Math.max(80, Math.min(640, P.x + (P.vx - 260) * dt * .5));
         P.inv = Math.max(0, P.inv - dt);
         if (P.hp < HP) { P.smokeT += dt; if (P.smokeT > .08 / (HP - P.hp)) { P.smokeT = 0; G.parts.push({ x: P.x - 30, y: P.y, vx: -P.vx * .3 + rand(-20, 20), vy: rand(-30, -5), life: rand(.6, 1.2), r: rand(3, 6), col: P.hp === 1 ? '#2b2b2b' : '#777' }); } }
@@ -841,7 +911,7 @@
       const cg = ctx.createLinearGradient(0, -15, 0, -6); cg.addColorStop(0, '#d8eef7'); cg.addColorStop(1, '#2f6f8a'); ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(8, -7); ctx.quadraticCurveTo(16, -15, 26, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(2, -2, 7, 4, 0, 0, Math.PI * 2); ctx.fill(); // toma de aire
       ctx.fillStyle = '#74acdf'; ctx.beginPath(); ctx.arc(-12, 0, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-12, 0, 2.4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = `rgba(255,170,70,${.5 + (keys.right ? .4 : 0) + Math.random() * .2})`; ctx.beginPath(); ctx.ellipse(-46, 0, 6 + (keys.right ? 8 : 0) + Math.random() * 3, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,170,70,${.5 + (inX() > .3 ? .4 : 0) + Math.random() * .2})`; ctx.beginPath(); ctx.ellipse(-46, 0, 6 + (inX() > .3 ? 8 : 0) + Math.random() * 3, 3, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     function drawHarrier(e) {
@@ -904,11 +974,12 @@
     else { // fondo del menú: hangar en reposo
       hangar.update(dt); hangar.draw();
     }
+    drawTouchUI();
     actEdge = false; act2Edge = false;
     requestAnimationFrame(frame);
   }
-  function fit() { const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0); }
-  addEventListener('resize', fit); fit();
+  function fit() { const r = cv.getBoundingClientRect(), dpr = Math.min(r.width < 700 ? 1.5 : 2, devicePixelRatio || 1); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0); }
+  addEventListener('resize', fit); document.addEventListener('fullscreenchange', () => setTimeout(fit, 50)); if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(fit, 50)); fit();
   hangar.init(); showStart(); requestAnimationFrame(frame);
 })();
 </script>
