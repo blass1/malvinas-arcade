@@ -20,9 +20,9 @@ Si perdés en cualquier nivel, la campaña arranca de cero. El puntaje acumulado
 | Acción · bomba · cañones | `E` o `Espacio` | botón grande |
 | Bengalas (nivel 3) | `F` o `Shift` | botón BENGALA |
 
-## Tabla de posiciones
+## Tabla de posiciones global
 
-Fuera de claude.ai no hay backend: los puntajes se guardan en el `localStorage` del navegador de cada jugador. Para una tabla compartida hace falta un servicio externo (por ejemplo Supabase); el punto de entrada es la función `recordScore` y `loadBoard` en `index.html`.
+Los puntajes viven en Supabase (tabla `scores`, proyecto `malvinas-arcade`). El juego usa la clave pública: lee la tabla con `GET /rest/v1/scores` y envía puntajes con la función `submit_score`, que solo crea o mejora el registro del propio nombre (nunca lo baja). RLS bloquea cualquier `update`/`delete` directo. Si no hay conexión, cae al `localStorage` del navegador. La configuración está en la constante `SB` al principio del script de `index.html`.
 
 ## Publicar con GitHub Pages
 

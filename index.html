@@ -298,21 +298,32 @@
   async function getDb() { if (dbTried) return DB; dbTried = true; try { DB = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { DB = null; } return DB; }
   const slug = n => n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'jugador';
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Tabla global: Supabase (clave pública, solo lectura + función submit_score que solo mejora el propio registro)
+  const SB = { url: 'https://wxjubvkkixzbnevdyvnh.supabase.co', key: 'sb_publishable_WpQMQiCyJNnIy_3iurz6Hg_dhUKrVix' };
+  const sbHeaders = { apikey: SB.key, Authorization: 'Bearer ' + SB.key, 'Content-Type': 'application/json' };
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
   function recordScore(name, scores, finished) {
     const total = scores.reduce((a, b) => a + b, 0), entry = { name, total, levels: scores.slice(), finished, at: new Date().toISOString() };
     const i = local.scores.findIndex(e => slug(e.name) === slug(name));
     if (i < 0) local.scores.push(entry); else if (total > local.scores[i].total) local.scores[i] = entry;
     local.scores.sort((a, b) => b.total - a.total); local.scores = local.scores.slice(0, 50); saveLocal();
-    getDb().then(async db => { if (!db) return; const ref = db.doc('scores/' + slug(name)); try { const cur = await ref.get(); if (!cur.exists || (cur.data().total || 0) < total) await ref.set(entry); } catch (e) {} });
+    getDb().then(async db => {
+      if (db) { const ref = db.doc('scores/' + slug(name)); try { const cur = await ref.get(); if (!cur.exists || (cur.data().total || 0) < total) await ref.set(entry); } catch (e) {} return; }
+      try { await withTimeout(fetch(SB.url + '/rest/v1/rpc/submit_score', { method: 'POST', headers: sbHeaders, body: JSON.stringify({ p_name: name, p_total: total, p_levels: scores, p_finished: finished }) }), 8000); } catch (e) {}
+    });
   }
   async function loadBoard() {
     const db = await getDb();
-    if (db) { try { const q = await Promise.race([db.collection('scores').orderBy('total', 'desc').limit(10).get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]); return { rows: q.docs.map(d => d.data()), shared: true }; } catch (e) {} }
+    if (db) { try { const q = await withTimeout(db.collection('scores').orderBy('total', 'desc').limit(10).get(), 8000); return { rows: q.docs.map(d => d.data()), shared: true }; } catch (e) {} }
+    try {
+      const r = await withTimeout(fetch(SB.url + '/rest/v1/scores?select=name,total,levels,finished&order=total.desc&limit=10', { headers: sbHeaders }), 8000);
+      if (r.ok) return { rows: await r.json(), shared: true };
+    } catch (e) {}
     return { rows: local.scores.slice(0, 10), shared: false };
   }
   function boardHtml(b) {
     if (!b.rows.length) return `<p class="rank">Todavía no hay puntajes. Sé el primero.</p>`;
-    return `<table class="board"><thead><tr><th>#</th><th>Piloto</th><th>Hangar</th><th>Estrecho</th><th>Cielo</th><th>Total</th></tr></thead><tbody>${b.rows.map((r, i) => `<tr${slug(r.name) === slug(run.name || local.name) ? ' class="me"' : ''}><td>${i + 1}</td><td>${esc(r.name)}${r.finished ? ' ★' : ''}</td><td>${(r.levels || [])[0] || 0}</td><td>${(r.levels || [])[1] || 0}</td><td>${(r.levels || [])[2] || 0}</td><td><b>${r.total}</b></td></tr>`).join('')}</tbody></table><p class="rank">${b.shared ? 'Tabla compartida entre todos los que juegan' : 'Tabla de este navegador'} · ★ campaña completa</p>`;
+    return `<table class="board"><thead><tr><th>#</th><th>Piloto</th><th>Hangar</th><th>Estrecho</th><th>Cielo</th><th>Total</th></tr></thead><tbody>${b.rows.map((r, i) => `<tr${slug(r.name) === slug(run.name || local.name) ? ' class="me"' : ''}><td>${i + 1}</td><td>${esc(r.name)}${r.finished ? ' ★' : ''}</td><td>${(r.levels || [])[0] || 0}</td><td>${(r.levels || [])[1] || 0}</td><td>${(r.levels || [])[2] || 0}</td><td><b>${r.total}</b></td></tr>`).join('')}</tbody></table><p class="rank">${b.shared ? 'Tabla global: todos los que juegan' : 'Sin conexión: tabla de este navegador'} · ★ campaña completa</p>`;
   }
   function showStart() {
     current = null; musicSet(MUSIC.hangar); A.tension = 0;
